@@ -1,0 +1,15 @@
+:root {
+  --primary: #ffffff;
+  --secondary: #000000;
+
+  --theme: #ff5c5c;
+  --blue: #0267bc;
+  --range: #ff5c5c;
+  --greyed: #dee2e6;
+  --subtitle: #6c757d;
+  --scrollbar: #d8dee3;
+
+  --toolbar-height: 40px;
+  --sidepanel-width: 250px;
+  --selector-image: url(data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz48c3ZnIHZlcnNpb249IjEuMSIgYmFzZVByb2ZpbGU9ImJhc2ljIiBpZD0iTGF5ZXJfMSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB4bWxuczp4bGluaz0iaHR0cDovL3d3dy53My5vcmcvMTk5OS94bGluayIgeD0iMHB4IiB5PSIwcHgiIHZpZXdCb3g9IjAgMCAxMi4zIDguNCIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+PHBvbHlnb24gZmlsbD0iI0ZGNUM1QyIgcG9pbnRzPSIxMi4zLDIuMiAxMC4xLDAgNi4xLDQgMi4yLDAuMSAwLDIuMyAzLjksNi4yIDMuOSw2LjIgNi4xLDguNCA2LjEsOC40IDYuMSw4LjQgOC4zLDYuMiA4LjMsNi4yICIvPjwvc3ZnPg==);
+}
