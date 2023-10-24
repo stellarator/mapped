@@ -223,7 +223,7 @@ export function useMap(container: string) {
           imageCache.add(imageId);
         }
       }
-      if (!dragItems.length || dragItems[0].properties?.icon !== imageId) {
+      if (!dragItems.length || dragItems[0].id !== item.id || dragItems[0].properties?.icon !== imageId) {
         dragItems[0] = {
           type: 'Feature',
           geometry: {
