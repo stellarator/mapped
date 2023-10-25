@@ -2,6 +2,7 @@
 import { inject, ref, watch, shallowRef, type ShallowRef } from 'vue';
 import type { Actions, MapItem } from '../map.js';
 import SubmitButton from './SubmitButton.vue';
+import { debounce } from '../utils.js';
 
 const selected = inject<ShallowRef<MapItem | undefined>>('selected');
 const mapActions = inject<Actions>('actions');
@@ -12,19 +13,24 @@ const getIcon = () => selected?.value?.properties?.icon && mapActions?.getIcon(s
 const input = ref(getText());
 const icon = shallowRef(getIcon());
 
-watch(input, () => {
-  if (selected?.value) {
-    selected.value.properties!.text = input.value || ' ';
-    mapActions?.updateItem(selected.value);
+const textUpdate = debounce(() => {
+  const item = selected?.value;
+  if (item && item.properties!.text !== input.value) {
+    mapActions?.updateItem(mapActions?.buildItem({
+      coordinates: item.geometry.coordinates,
+      properties: {...item.properties, text: input.value || ' ' },
+      id: item.id,
+    }));
   }
 });
 
+watch(input, textUpdate);
 watch(selected!, () => {
   input.value = getText();
   icon.value = getIcon();
 });
 
-const deleteLabel = async (event: MouseEvent) => {
+const deleteLabel = () => {
   if (selected?.value) mapActions?.deleteItem(selected.value);
 };
 </script>

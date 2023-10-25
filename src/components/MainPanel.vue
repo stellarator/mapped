@@ -19,10 +19,17 @@ import ImportIcon from './icons/IconImport.vue';
 
 import BasePanel, { type Action } from './BasePanel.vue';
 import NotImplemented from './NotImplemented.vue';
+import SubmitButton from './SubmitButton.vue';
 import ElementsList from './ElementsList.vue';
 import ExportImage from './ExportImage.vue';
 import IconsTab from './IconsTab.vue';
 import LabelsTab from './LabelsTab.vue';
+
+import type { Actions, Modes } from '../map.js';
+import { inject } from 'vue';
+
+const mapActions = inject<Actions>('actions');
+const mapMode = inject<Modes>('modes');
 
 const actions = [
   {
@@ -98,19 +105,24 @@ const actions = [
       },
     ],
   },
-  // {
-  //   icon: RollbackIcon,
-  //   tabs: [],
-  // }
 ] as Action[];
 </script>
 
 <template>
-  <BasePanel :actions="actions" />
+  <BasePanel :actions="actions">
+    <SubmitButton v-if="mapMode?.backMode.value" class="button" @click="mapActions?.rollBack"><RollbackIcon /></SubmitButton>
+  </BasePanel>
 </template>
 
 <style scoped>
 .side-panel {
   flex-direction: row;
+}
+.button {
+  border: none;
+}
+.button>:deep(svg) {
+  width: 75%;
+  height: 75%;
 }
 </style>

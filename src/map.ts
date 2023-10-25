@@ -8,12 +8,13 @@ import type {
   MapTouchEvent,
   MapboxGeoJSONFeature,
 } from 'mapbox-gl';
-import type { Feature, FeatureCollection, Point } from 'geojson';
+import type { Feature, FeatureCollection, GeoJsonProperties, Point, Position } from 'geojson';
 
 import { ref, onMounted, onUnmounted, shallowRef, watch, type Ref } from 'vue';
 import { getEditFrame, getIconImage, getIconMeta, getImageId, type Icon } from './utils.js';
 import mapboxgl from 'mapbox-gl';
 
+export type RawData = { coordinates: Position; properties: GeoJsonProperties; id?: string | number };
 export type MapItem = Feature<Point>;
 export type MapItems = MapItem[];
 
@@ -25,6 +26,8 @@ export interface Dimensions {
 export interface Actions {
   addIcon: (icon: Icon) => Promise<string>;
   getIcon: (id: string) => Icon;
+  rollBack: () => void;
+  buildItem: (rawData: RawData) => MapItem;
   createItem: (item: MapItem) => void;
   updateItem: (item: MapItem) => void;
   deleteItem: (item: MapItem) => void;
@@ -33,6 +36,7 @@ export interface Actions {
 export interface Modes {
   dragMode: Ref<boolean>;
   editMode: Ref<boolean>;
+  backMode: Ref<boolean>;
 }
 export interface Map {
   map: _Map | null;
@@ -68,7 +72,7 @@ export function useMap(container: string) {
   const map = shallowRef<_Map | null>(null);
 
   const lng = ref(5.48);
-  const lat = ref(51.44);
+  const lat = ref(51.45);
   const zoom = ref(12);
   const pitch = ref(0);
   const bearing = ref(0);
@@ -79,7 +83,9 @@ export function useMap(container: string) {
 
   const dragMode = ref(false);
   const editMode = ref(false);
+  const backMode = ref(false);
 
+  const rollback: [number, RawData | null][] = [];
   const selected = shallowRef<MapItem | undefined>();
   let dragged: MapboxGeoJSONFeature | undefined;
 
@@ -96,14 +102,54 @@ export function useMap(container: string) {
     [dragItems, { id: DRAG_SOURCE_ID, data: dragGeoJSON }],
   ]);
 
-  const propagateItems = (items: MapItems = mainItems) => {
+  const rollBack = () => {
+    if (!rollback.length) return;
+
+    const [idx, rawData] = rollback.pop()!;
+    backMode.value = rollback.length > 0;
+
+    if (rawData === null) {
+      // Undo Create
+      deleteItem(mainItems[0], false);
+    } else if (idx < mainItems.length && mainItems[idx].id === rawData.id) {
+      // Undo Update
+      updateItem(buildItem(rawData), false);
+    } else {
+      // Undo Delete
+      mainItems.splice(idx, 0, buildItem(rawData));
+      propagateItems(mainItems);
+    }
+  };
+
+  const propagateItems = (items: MapItems) => {
     const { id, data } = sourceCache.get(items)!;
     (map.value?.getSource(id) as GeoJSONSource | null)?.setData(data);
   }
 
-  const createItem = (item: MapItem, items = mainItems) => {
-    items.unshift(item);
-    propagateItems(items);
+  const buildItem = (rawData: RawData): MapItem => ({
+    type: 'Feature',
+    geometry: {
+      type: 'Point',
+      coordinates: rawData.coordinates,
+    },
+    properties: rawData.properties,
+    id: rawData.id ?? Date.now(),
+  });
+
+  const getRawData = (item: MapItem): RawData => ({
+     coordinates: item.geometry.coordinates.slice(),
+     properties: {...item.properties},
+     id: item.id,
+  });
+
+  const createItem = (item: MapItem, withRollback = true) => {
+    if (withRollback) {
+      rollback.push([0, null]);
+      backMode.value = true;
+    }
+
+    mainItems.unshift(item);
+    propagateItems(mainItems);
   };
 
   let rafTimeout = 0;
@@ -112,24 +158,36 @@ export function useMap(container: string) {
     if (rafTimeout) requestAnimationFrame(rafHandler);
   };
 
-  const updateItem = (item: MapItem, items = mainItems) => {
-    propagateItems(items);
-
-    if (selected.value?.id === item.id) {
-      if (rafTimeout) {
-        clearTimeout(rafTimeout);
-      } else {
-        requestAnimationFrame(rafHandler);
+  const updateItem = (item: MapItem, withRollback = true) => {
+    const idx = mainItems.findIndex(findIndex, item);
+    if (~idx) {
+      if (withRollback) {
+        rollback.push([idx, getRawData(mainItems[idx])]);
+        backMode.value = true;
       }
-      rafTimeout = setTimeout(() => rafTimeout = 0, 1000) as unknown as number;
+
+      Object.assign(mainItems[idx], item);
+      propagateItems(mainItems);
+
+      if (selected.value?.id === item.id) {
+        if (rafTimeout) clearTimeout(rafTimeout);
+        else requestAnimationFrame(rafHandler);
+        rafTimeout = setTimeout(() => rafTimeout = 0, 1000) as unknown as number;
+      }
     }
   };
 
-  const deleteItem = (item: MapItem, items = mainItems) => {
-    const idx = items.findIndex(({ id }) => id === item.id);
+  const deleteItem = (item: MapItem, withRollback = true) => {
+    const idx = mainItems.findIndex(findIndex, item);
     if (~idx) {
-      items.splice(idx, 1);
-      propagateItems(items);
+      if (withRollback) {
+        rollback.push([idx, getRawData(item)]);
+        backMode.value = true;
+      }
+
+      mainItems.splice(idx, 1);
+      propagateItems(mainItems);
+
       if (selected.value?.id === item.id) {
         clearSelection();
       }
@@ -223,19 +281,16 @@ export function useMap(container: string) {
           imageCache.add(imageId);
         }
       }
-      if (!dragItems.length || dragItems[0].id !== item.id || dragItems[0].properties?.icon !== imageId) {
-        dragItems[0] = {
-          type: 'Feature',
-          geometry: {
-            type: 'Point',
-            coordinates: item.geometry.coordinates,
-          },
-          properties: {
-            icon: imageId,
-            text: '',
-          },
-          id: item.id
-        };
+      if (!dragItems.length
+        || dragItems[0].id !== item.id
+        || dragItems[0].properties?.icon !== imageId
+        || dragItems[0].geometry.coordinates !== item?.geometry.coordinates
+      ) {
+        dragItems[0] = buildItem({
+           coordinates: item.geometry.coordinates,
+           properties: { icon: imageId },
+           id: item.id,
+        });
 
         propagateItems(dragItems);
         selected.value = item;
@@ -264,12 +319,19 @@ export function useMap(container: string) {
     }
   };
 
-  const moveToDragLayer = (item?: MapboxGeoJSONFeature) => {
-    if (item) {
-      const mainItem = mainItems.find(({ id }) => id === item.id);
+  const moveToDragLayer = (feature?: MapboxGeoJSONFeature) => {
+    if (feature) {
+      const idx = mainItems.findIndex(findIndex, feature);
 
-      if (mainItem) {
-        createItem(mainItem, dragItems);
+      if (~idx) {
+        const item = mainItems[idx];
+
+        rollback.push([idx, getRawData(item)]);
+        backMode.value = true;
+
+        dragItems.unshift(item);
+        propagateItems(dragItems);
+
         requestAnimationFrame(() => {
           map.value?.setFilter(MAIN_LAYER_ID, ['!=', ['id'], item.id]);
         })
@@ -293,7 +355,7 @@ export function useMap(container: string) {
     const _map: _Map = new mapboxgl.Map({
       container,
       style: 'mapbox://styles/mapbox/streets-v11',
-      center: [5.48, 51.44],
+      center: [5.48, 51.45],
       zoom: 12,
 
       preserveDrawingBuffer: true,
@@ -434,8 +496,8 @@ export function useMap(container: string) {
 
   return {
     map, lng, lat, zoom, pitch, bearing, selected,
-    modes: { dragMode, editMode },
-    actions: { addIcon, getIcon, createItem, updateItem, deleteItem, toggleLayer },
+    modes: { dragMode, editMode, backMode },
+    actions: { addIcon, getIcon, rollBack, buildItem, createItem, updateItem, deleteItem, toggleLayer },
     dimensions: { scale, canvasWidth, canvasHeight },
   };
 }
@@ -512,3 +574,4 @@ function getLabelDimensions(map: _Map | null, item?: MapItem) {
 }
 
 function getScale() { return window?.devicePixelRatio || 1 }
+function findIndex(this: MapItem, { id }: MapItem) { return id === this.id }

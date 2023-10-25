@@ -27,6 +27,7 @@ const updateIndex = (index: number) => selectedTab.value[activeIndex.value] = in
           <component :is="action.icon" />
         </template>
       </ActionButton>
+      <slot />
     </section>
     <section class="context-menu" v-if="activeIndex >= 0">
       <ActionTabs :tabs="actions[activeIndex].tabs as Tab[]"

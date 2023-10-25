@@ -139,3 +139,17 @@ export function saveImage(canvas: HTMLCanvasElement, width: number, height: numb
   // link.download = filename;
   // link.click();
 }
+
+export function debounce(func: (...args: unknown[]) => void, wait = 500) {
+  let timeout: number;
+
+  return (...args: unknown[]) => {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+
+    if (timeout) clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}

@@ -9,23 +9,17 @@ const mapActions = inject<Actions>('actions');
 
 const input = ref('');
 
-const createLabel = async (event: MouseEvent) => {
+const createLabel = () => {
   if (map?.value && input.value) {
     const { lng, lat } = map.value.getCenter();
-    mapActions?.createItem({
-      type: 'Feature',
-      geometry: {
-        type: 'Point',
-        coordinates: [lng, lat],
-      },
+    mapActions?.createItem(mapActions?.buildItem({
+      coordinates: [lng, lat],
       properties: {
-        icon: '',
         text: input.value,
         id: input.value,
         textSize: 24,
       },
-      id: Date.now()
-    });
+    }));
     input.value = '';
   }
 };

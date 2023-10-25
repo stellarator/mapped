@@ -36,19 +36,13 @@ const createLabel = async (event: MouseEvent) => {
   if (map?.value && icon) {
     const iconId = await mapActions?.addIcon(icon);
     const { lng, lat } = map.value.getCenter();
-    mapActions?.createItem({
-      type: 'Feature',
-      geometry: {
-        type: 'Point',
-        coordinates: [lng, lat],
-      },
-      properties: {
-        icon: iconId,
-        text: '',
-        id,
-      },
-      id: Date.now()
-    });
+    mapActions?.createItem(mapActions?.buildItem({
+       coordinates: [lng, lat],
+       properties: {
+          icon: iconId,
+          id,
+       },
+    }));
   }
 };
 
