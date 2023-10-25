@@ -286,6 +286,11 @@ export function useMap(container: string) {
         || dragItems[0].properties?.icon !== imageId
         || dragItems[0].geometry.coordinates !== item?.geometry.coordinates
       ) {
+        if (rafTimeout && dragItems?.[0].properties?.icon !== imageId) {
+          clearTimeout(rafTimeout);
+          rafTimeout = 0;
+        }
+
         dragItems[0] = buildItem({
            coordinates: item.geometry.coordinates,
            properties: { icon: imageId },
@@ -293,13 +298,9 @@ export function useMap(container: string) {
         });
 
         propagateItems(dragItems);
+        selected.value = undefined;
         selected.value = item;
         editMode.value = true;
-
-        if (rafTimeout) {
-          clearTimeout(rafTimeout);
-          rafTimeout = 0;
-        }
       }
     }
   }
